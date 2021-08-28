@@ -4,14 +4,15 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 import tkinter as tk
 
 # ----------------------------------------- INPUTS -----------------------------------------
-column_names = ["Stock Symbol","Expiry","Type","Buy/Sell","Open\nPrice/Share","# Shares",\
-                "Current\nPrice/Share","Strike","Premium","# Contracts","Close\nStrategy",\
-                "Close\nPrice/Share","Close\nPremium","Fee","Profit/Loss",\
-                "Net Realized P/L\nFor Underlier","Status","Account"]
-maxColumns = 26
-maxRows = 30
+column_names = ["Stock Symbol"]
+maxColumns = 10
+maxRows = 10
 # ------------------------------------------------------------
+# derive parameters
+newEntryButtonOffset = 3
+seriesOffset = newEntryButtonOffset + 1
 
+# create scrollable window
 window = tk.Tk()
 
 # get width x height of display
@@ -25,13 +26,19 @@ window.title("Options Positions")
 [window.rowconfigure(i, weight=1) for i in range(maxRows)]
 
 # Create column headers
-seriesOffset = 11
 col = 0
 for label in column_names:
     columnLabel = tk.Label( text=label,\
                             font='"Helvetica Neue" 14 bold')
     columnLabel.grid(column=col, row=seriesOffset)
     col=col+1
+
+# create "new entry" fields
+col = 0
+for j in range(1):
+    addEntryButton = tk.Button(window, text="+ Entry")
+    addEntryButton.grid(column=col, row=newEntryButtonOffset)
+    col = col + 1
 
 window.lift()
 window.attributes('-topmost',True)
