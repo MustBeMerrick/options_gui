@@ -21,34 +21,39 @@ class TableApp(FloatLayout):
     self.add_row_btn = Button(
       text="New Trade",
       size_hint=(None, None),  # Fixed size
-      size=(180, 80),         # Button dimensions
-      pos_hint={"x": 0.05, "top": 0.98}  # Top-left corner
+      size=(140, 60),         # Button dimensions
+      pos_hint={"x": 0.05, "top": 0.96}  # Top-left corner
     )
     self.add_row_btn.bind(on_press=self.open_add_row_popup)
     self.add_widget(self.add_row_btn)
 
-    # Create a scrollable area for the table (including the header)
-    self.scroll_view = ScrollView(
-      size_hint=(1, 0.77),
-      pos_hint={"x": 0, "y": 0.1}
+    # Create options table header (fixed)
+    self.option_table_header = GridLayout(
+      cols=13,
+      pos_hint={"x": 0.00, "top": 0.86},
+      height=50  # Start with the height of the header row
     )
 
-    # Create a grid layout for the table
+    for header in ["Ticker", "Open\nDate", "Expiry", "Type", "Open", "Strike", "Underlier", "Premium", "Fee", "Qnt", "Close", "Close\nPremium", "P/L"]:
+      self.option_table_header.add_widget(Label(
+        text=header, bold=True, halign="center", valign="middle",
+        text_size=(None, None), size_hint_y=None, height=60
+      ))
+
+    self.add_widget(self.option_table_header)
+
+    # Create a scrollable area for the table (excluding the header)
+    self.scroll_view = ScrollView(
+      size_hint=(1, 0.77),
+      pos_hint={"x": 0, "top": 0.8}
+    )
+
+    # Create a grid layout for the options table
     self.table = GridLayout(
       cols=13,
       size_hint_y=None,  # Allow dynamic height
       height=50  # Start with the height of the header row
     )
-
-    # Add the header row directly into the table
-    for header in [
-      "Ticker", "Open\nDate", "Expiry", "Type", "Open", "Strike", "Underlier", 
-      "Premium", "Fee", "Qnt", "Close", "Close\nPremium", "P/L"
-    ]:
-      self.table.add_widget(Label(
-        text=header, bold=True, halign="center", valign="middle",
-        text_size=(None, None), size_hint_y=None, height=60
-      ))
 
     self.scroll_view.add_widget(self.table)
     self.add_widget(self.scroll_view)
@@ -60,31 +65,26 @@ class TableApp(FloatLayout):
     """Opens a popup to prompt the user for row values."""
     popup_layout = BoxLayout(orientation='vertical', spacing=10, padding=10)
 
-    # Create a scrollable area for the input fields
-    scroll_view = ScrollView(size_hint=(1, 0.8))
-    input_layout = BoxLayout(orientation='vertical', spacing=10, size_hint_y=None)
+    # Create an area for the input fields
+    input_layout = BoxLayout(orientation='vertical', spacing=13, size_hint_y=None)
     input_layout.bind(minimum_height=input_layout.setter('height'))
 
-    # Input fields for the thirteen columns
+    # Input fields for columns
     self.inputs = [
-      TextInput(hint_text=header, multiline=False, size_hint_y=None, height=50)
-      for header in [
-        "Ticker", "Open Date", "Expiry", "Type", "Open", "Strike", 
-        "Premium", "Fee", "Qnt", "Close", "Close Premium"
-      ]
+      TextInput(hint_text=header, multiline=False, size_hint_y=None, height=30, size_hint_x=None, width=200)
+      for header in ["Ticker", "Open Date", "Expiry", "Type", "Open", "Strike", "Premium", "Qnt"]
     ]
 
     for input_field in self.inputs:
       input_layout.add_widget(input_field)
 
-    scroll_view.add_widget(input_layout)
-    popup_layout.add_widget(scroll_view)
+    popup_layout.add_widget(input_layout)
 
     # Buttons for submission and cancellation
-    button_layout = BoxLayout(size_hint_y=None, height=40, spacing=10)
-    submit_btn = Button(text="Submit", size_hint=(1, None))
+    button_layout = BoxLayout(size_hint_y=0.5, height=10, spacing=10)
+    submit_btn = Button(text="Submit", size_hint=(1, 0.8))
     submit_btn.bind(on_press=self.add_row_from_popup)
-    cancel_btn = Button(text="Cancel", size_hint=(1, None))
+    cancel_btn = Button(text="Cancel", size_hint=(1, 0.8))
     cancel_btn.bind(on_press=lambda x: self.popup.dismiss())
 
     button_layout.add_widget(submit_btn)
@@ -92,7 +92,7 @@ class TableApp(FloatLayout):
     popup_layout.add_widget(button_layout)
 
     # Create and open the popup
-    self.popup = Popup(title="Add Row", content=popup_layout, size_hint=(0.8, 0.8))
+    self.popup = Popup(title="Add Row", content=popup_layout, size_hint=(0.23, 0.7))
     self.popup.open()
 
   def add_row_from_popup(self, instance):
@@ -143,7 +143,7 @@ class MyKivyApp(App):
   def build(self):
     self.title = "Trading Table"
     from kivy.core.window import Window
-    Window.size = (900, 600)  # Set the default application window size
+    Window.size = (1200, 700)  # Set the default application window size
 
     return TableApp()
 
