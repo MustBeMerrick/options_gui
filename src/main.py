@@ -1,4 +1,5 @@
 from kivy.app import App
+# This is a random comment added to the code
 from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.button import Button
