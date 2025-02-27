@@ -1,152 +1,212 @@
 from kivy.app import App
-# This is a random comment added to the code
-from kivy.uix.floatlayout import FloatLayout
-from kivy.uix.gridlayout import GridLayout
 from kivy.uix.button import Button
-from kivy.uix.label import Label
-from kivy.uix.scrollview import ScrollView
+from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.popup import Popup
 from kivy.uix.textinput import TextInput
-from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.label import Label
+from kivy.uix.gridlayout import GridLayout
 from kivy.uix.scrollview import ScrollView
-import json
-import os
 
-class TableApp(FloatLayout):
-  SAVE_FILE = "table_data.json"
 
-  def __init__(self, **kwargs):
-    super().__init__(**kwargs)
+class ClosePositionPopup(Popup):
+    def __init__(self, trade_table, row_index, **kwargs):
+        super().__init__(title="Close Position", size_hint=(0.7, 0.5), **kwargs)
+        self.trade_table = trade_table
+        self.row_index = row_index
 
-    # Button at the top-left corner
-    self.add_row_btn = Button(
-      text="New Trade",
-      size_hint=(None, None),  # Fixed size
-      size=(140, 60),         # Button dimensions
-      pos_hint={"x": 0.05, "top": 0.96}  # Top-left corner
-    )
-    self.add_row_btn.bind(on_press=self.open_add_row_popup)
-    self.add_widget(self.add_row_btn)
+        layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
 
-    # Create options table header (fixed)
-    self.option_table_header = GridLayout(
-      cols=13,
-      pos_hint={"x": 0.00, "top": 0.86},
-      height=50  # Start with the height of the header row
-    )
+        # Input Fields
+        self.inputs = {}
+        fields = ["Sell Date", "Sell Price"]
+        for field in fields:
+            box = BoxLayout(orientation="horizontal", size_hint_y=None, height=40)
+            label = Label(text=f"{field}:", size_hint_x=0.4)
+            text_input = TextInput(multiline=False)
+            self.inputs[field] = text_input
+            box.add_widget(label)
+            box.add_widget(text_input)
+            layout.add_widget(box)
 
-    for header in ["Ticker", "Open\nDate", "Expiry", "Type", "Open", "Strike", "Underlier", "Premium", "Fee", "Qnt", "Close", "Close\nPremium", "P/L"]:
-      self.option_table_header.add_widget(Label(
-        text=header, bold=True, halign="center", valign="middle",
-        text_size=(None, None), size_hint_y=None, height=60
-      ))
+        # Buttons
+        button_layout = BoxLayout(size_hint_y=None, height=50, spacing=20)
+        confirm_button = Button(text="Confirm", on_press=self.confirm_close_position)
+        cancel_button = Button(text="Cancel", on_press=self.dismiss)
+        button_layout.add_widget(confirm_button)
+        button_layout.add_widget(cancel_button)
+        layout.add_widget(button_layout)
 
-    self.add_widget(self.option_table_header)
+        self.content = layout
 
-    # Create a scrollable area for the table (excluding the header)
-    self.scroll_view = ScrollView(
-      size_hint=(1, 0.77),
-      pos_hint={"x": 0, "top": 0.8}
-    )
+    def confirm_close_position(self, instance):
+        """Validate input, update row with sell details, and compute P/L."""
+        try:
+            sell_date = self.inputs["Sell Date"].text.strip()
+            sell_price_text = self.inputs["Sell Price"].text.strip()
 
-    # Create a grid layout for the options table
-    self.table = GridLayout(
-      cols=13,
-      size_hint_y=None,  # Allow dynamic height
-      height=50  # Start with the height of the header row
-    )
+            if not sell_date:
+                print("Sell Date cannot be empty.")
+                return
 
-    self.scroll_view.add_widget(self.table)
-    self.add_widget(self.scroll_view)
+            try:
+                sell_price = float(sell_price_text)
+            except ValueError:
+                print("Sell Price must be a valid number.")
+                return
 
-    # Load table state from file
-    self.load_table_state()
+            if sell_price <= 0:
+                print("Sell Price must be greater than 0.")
+                return
 
-  def open_add_row_popup(self, instance):
-    """Opens a popup to prompt the user for row values."""
-    popup_layout = BoxLayout(orientation='vertical', spacing=10, padding=10)
+            self.trade_table.close_position(self.row_index, sell_date, sell_price)
+            self.dismiss()
 
-    # Create an area for the input fields
-    input_layout = BoxLayout(orientation='vertical', spacing=13, size_hint_y=None)
-    input_layout.bind(minimum_height=input_layout.setter('height'))
+        except Exception as e:
+            print(f"Unexpected error: {str(e)}")
 
-    # Input fields for columns
-    self.inputs = [
-      TextInput(hint_text=header, multiline=False, size_hint_y=None, height=30, size_hint_x=None, width=200)
-      for header in ["Ticker", "Open Date", "Expiry", "Type", "Open", "Strike", "Premium", "Qnt"]
-    ]
 
-    for input_field in self.inputs:
-      input_layout.add_widget(input_field)
+class TradeTable(GridLayout):
+    def __init__(self, **kwargs):
+        super().__init__(cols=9, row_force_default=True, row_default_height=40, spacing=5, size_hint_y=None, **kwargs)
+        self.bind(minimum_height=self.setter('height'))
+        self.trade_rows = []
 
-    popup_layout.add_widget(input_layout)
+        # Table Headers
+        headers = ["Ticker", "Buy Date", "Buy Price", "Num Shares", "Notional", "Sell Date", "Sell Price", "P/L", "Action"]
+        for header in headers:
+            label = Label(text=header, bold=True, size_hint_y=None, height=40)
+            self.add_widget(label)
 
-    # Buttons for submission and cancellation
-    button_layout = BoxLayout(size_hint_y=0.5, height=10, spacing=10)
-    submit_btn = Button(text="Submit", size_hint=(1, 0.8))
-    submit_btn.bind(on_press=self.add_row_from_popup)
-    cancel_btn = Button(text="Cancel", size_hint=(1, 0.8))
-    cancel_btn.bind(on_press=lambda x: self.popup.dismiss())
+    def add_trade(self, trade_data):
+        """Add a new trade row to the table."""
+        row_widgets = []
 
-    button_layout.add_widget(submit_btn)
-    button_layout.add_widget(cancel_btn)
-    popup_layout.add_widget(button_layout)
+        for data in trade_data:
+            label = Label(text=str(data), size_hint_y=None, height=40)
+            self.add_widget(label)
+            row_widgets.append(label)
 
-    # Create and open the popup
-    self.popup = Popup(title="Add Row", content=popup_layout, size_hint=(0.23, 0.7))
-    self.popup.open()
+        # Add "Close Position" button
+        close_btn = Button(text="Close Position", size_hint_y=None, height=40)
+        close_btn.bind(on_press=lambda instance, index=len(self.trade_rows): self.open_close_position_popup(index))
+        self.add_widget(close_btn)
+        row_widgets.append(close_btn)
 
-  def add_row_from_popup(self, instance):
-    """Adds a new row with user-provided values from the popup."""
-    row_values = [input_field.text if input_field.text else "" for input_field in self.inputs]
+        # Store row for updating later
+        self.trade_rows.append(row_widgets)
 
-    # Add new row values
-    for value in row_values:
-      self.table.add_widget(Label(text=value))
+        # Update table height
+        self.height = len(self.trade_rows) * 40 + 40
+        self.parent.parent.scroll_y = 1  # Auto-scroll to the top for new trades
 
-    # Dynamically increase the table height for each row
-    row_height = 50  # Adjust based on your row size
-    self.table.height += row_height
+        # Refresh UI
+        self.canvas.ask_update()
 
-    # Save state after adding a row
-    self.save_table_state()
+    def open_close_position_popup(self, row_index):
+        """Open the Close Position popup."""
+        row_widgets = self.trade_rows[row_index]
 
-    # Dismiss the popup
-    self.popup.dismiss()
+        buy_price = row_widgets[2].text
+        if buy_price == "-":
+            print("Invalid Operation: Cannot sell before buying.")
+            return
 
-  def save_table_state(self):
-    """Saves the current table state to a file."""
-    table_data = []
-    for widget in self.table.children[::-1]:  # Reverse order to get rows in correct sequence
-      if isinstance(widget, Label):
-        table_data.append(widget.text)
+        popup = ClosePositionPopup(self, row_index)
+        popup.open()
 
-    # Group table data into rows of 13 (columns per row)
-    grouped_data = [table_data[i:i+13] for i in range(0, len(table_data), 13)]
+    def close_position(self, row_index, sell_date, sell_price):
+        """Close position, update sell details, and compute P/L."""
+        row_widgets = self.trade_rows[row_index]
 
-    with open(self.SAVE_FILE, "w") as f:
-      json.dump(grouped_data, f)
+        # Remove any non-numeric formatting
+        buy_price_text = row_widgets[2].text.strip()
+        try:
+            buy_price = float(buy_price_text)
+        except ValueError:
+            print("Conversion Error: Could not convert Buy Price to a number.")
+            return
 
-  def load_table_state(self):
-    """Loads the table state from a file if it exists."""
-    if os.path.exists(self.SAVE_FILE):
-      with open(self.SAVE_FILE, "r") as f:
-        table_data = json.load(f)
+        # Update Sell Date and Sell Price
+        row_widgets[5].text = sell_date
+        row_widgets[6].text = f"{sell_price:.2f}"
 
-      for row in table_data:
-        for cell in row:
-          self.table.add_widget(Label(text=cell))
+        # Calculate P/L
+        num_shares = int(row_widgets[3].text)
+        pl = (sell_price - buy_price) * num_shares
+        row_widgets[7].text = f"{pl:.2f}"
 
-        # Dynamically increase the table height for each row
-        self.table.height += 50
+        # Highlight P/L (Green = Gain, Red = Loss)
+        row_widgets[7].color = (0, 1, 0, 1) if pl > 0 else (1, 0, 0, 1)
 
-class MyKivyApp(App):
-  def build(self):
-    self.title = "Trading Table"
-    from kivy.core.window import Window
-    Window.size = (1200, 700)  # Set the default application window size
 
-    return TableApp()
+class AddTradePopup(Popup):
+    def __init__(self, trade_table, **kwargs):
+        super().__init__(title="Add Trade", size_hint=(0.7, 0.7), **kwargs)
+        self.trade_table = trade_table
+
+        layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
+
+        # Input Fields
+        self.inputs = {}
+        fields = ["Ticker", "Buy Date", "Buy Price", "Num Shares"]
+        for field in fields:
+            box = BoxLayout(orientation="horizontal", size_hint_y=None, height=40)
+            label = Label(text=f"{field}:", size_hint_x=0.4)
+            text_input = TextInput(multiline=False)
+            self.inputs[field] = text_input
+            box.add_widget(label)
+            box.add_widget(text_input)
+            layout.add_widget(box)
+
+        # Buttons
+        button_layout = BoxLayout(size_hint_y=None, height=50, spacing=20)
+        confirm_button = Button(text="Confirm", on_press=self.confirm_trade)
+        cancel_button = Button(text="Cancel", on_press=self.dismiss)
+        button_layout.add_widget(confirm_button)
+        button_layout.add_widget(cancel_button)
+        layout.add_widget(button_layout)
+
+        self.content = layout
+
+    def confirm_trade(self, instance):
+        """Validate input, calculate Notional, and add trade to the table."""
+        try:
+            ticker = self.inputs["Ticker"].text.strip().upper()
+            buy_date = self.inputs["Buy Date"].text.strip()
+            buy_price = float(self.inputs["Buy Price"].text)
+            num_shares = int(self.inputs["Num Shares"].text)
+            notional = round(buy_price * num_shares, 2)
+
+            trade_data = [ticker, buy_date, f"{buy_price:.2f}", str(num_shares), f"{notional:.2f}", "-", "-", "-"]
+            self.trade_table.add_trade(trade_data)
+            self.dismiss()
+
+        except ValueError:
+            print("Invalid Input: Ensure numeric fields contain valid numbers.")
+
+
+class MainWindow(BoxLayout):
+    def __init__(self, **kwargs):
+        super().__init__(orientation="vertical", **kwargs)
+
+        self.add_trade_button = Button(text="Add Trade", size_hint=(1, 0.1), on_press=self.open_add_trade_popup)
+        self.add_widget(self.add_trade_button)
+
+        self.scroll = ScrollView(size_hint=(1, 0.9))
+        self.table = TradeTable()
+        self.scroll.add_widget(self.table)
+        self.add_widget(self.scroll)
+
+    def open_add_trade_popup(self, instance):
+        popup = AddTradePopup(self.table)
+        popup.open()
+
+
+class TradeApp(App):
+    def build(self):
+        return MainWindow()
+
 
 if __name__ == "__main__":
-  MyKivyApp().run()
+    TradeApp().run()
+

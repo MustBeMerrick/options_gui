@@ -1,0 +1,25 @@
+<Button>:
+    font_size: 18
+    size_hint_y: None
+    height: 50
+
+<TradeTable>:
+    cols: 8
+    size_hint_y: None
+    height: self.minimum_height  # Dynamic height
+
+<MainWindow>:
+    orientation: "vertical"
+
+    ScrollView:
+        size_hint: 1, 0.8
+        GridLayout:
+            id: table
+            cols: 8
+            size_hint_y: None
+            height: self.minimum_height
+
+    Button:
+        text: "Add Trade"
+        size_hint: 1, 0.2
+
