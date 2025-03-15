@@ -1,3 +1,5 @@
+import json
+import os
 from kivy.app import App
 from kivy.uix.button import Button
 from kivy.uix.boxlayout import BoxLayout
@@ -6,6 +8,10 @@ from kivy.uix.textinput import TextInput
 from kivy.uix.label import Label
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.scrollview import ScrollView
+from kivy.core.window import Window
+
+# TODO: Set a proper path to save file
+#SAVE_FILE="/path/to/file"
 
 
 class ClosePositionPopup(Popup):
@@ -77,6 +83,8 @@ class TradeTable(GridLayout):
             label = Label(text=header, bold=True, size_hint_y=None, height=40)
             self.add_widget(label)
 
+        # TODO: Load trades from JSON on startup here. Can use the load_trades method created in this class
+
     def add_trade(self, trade_data):
         """Add a new trade row to the table."""
         row_widgets = []
@@ -137,6 +145,20 @@ class TradeTable(GridLayout):
 
         # Highlight P/L (Green = Gain, Red = Loss)
         row_widgets[7].color = (0, 1, 0, 1) if pl > 0 else (1, 0, 0, 1)
+
+    # TODO: create save_trades method here
+    #       start with empty trades = [] variable
+    #       iterate over each row in self.trade_rows.
+    #       use another for loop to iterate over each item (column) in the row and append to new variable 'trade_data'
+    #       IMPORTANT: make sure to exclude the button item "Close Position". This is the last item in the row
+    #       append the newly created trade_data variable to trades List that you created in first step
+    #       open save file (json) for 'write' and use json.dump to create or overwrite the file.
+    #       optional: use print("print message here") to notify user their info was saved. See if you can print the save path as well
+
+    # TODO: create load_trades method here
+    #       First use os.path.exists to check if save file exists.
+    #       Then open the file as 'read'. Use json.load to load file.
+    #       Iterate over each trade in trades loaded from json file, and leverage add_trade method in this class to create the table
 
 
 class AddTradePopup(Popup):
@@ -204,7 +226,16 @@ class MainWindow(BoxLayout):
 
 class TradeApp(App):
     def build(self):
+        Window.bind(on_close=self.on_window_close)  # Bind window close event
         return MainWindow()
+
+    def on_stop(self):
+        """Save trades when the app closes."""
+        self.root.table.save_trades()
+
+    def on_window_close(self, *args):
+        """Save trades when the window is closed."""
+        self.root.table.save_trades()
 
 
 if __name__ == "__main__":
