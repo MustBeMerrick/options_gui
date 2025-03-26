@@ -9,9 +9,10 @@ from kivy.uix.label import Label
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.scrollview import ScrollView
 from kivy.core.window import Window
+from kivy.clock import Clock
 
-# TODO: Set a proper path to save file
-#SAVE_FILE="/path/to/file"
+# Set a proper path to save file
+SAVE_FILE = "./../trades.json"
 
 
 class ClosePositionPopup(Popup):
@@ -83,7 +84,7 @@ class TradeTable(GridLayout):
             label = Label(text=header, bold=True, size_hint_y=None, height=40)
             self.add_widget(label)
 
-        # TODO: Load trades from JSON on startup here. Can use the load_trades method created in this class
+        self.load_trades()  # Load trades on startup
 
     def add_trade(self, trade_data):
         """Add a new trade row to the table."""
@@ -105,10 +106,17 @@ class TradeTable(GridLayout):
 
         # Update table height
         self.height = len(self.trade_rows) * 40 + 40
-        self.parent.parent.scroll_y = 1  # Auto-scroll to the top for new trades
+
+        # Defer the scroll adjustment until after the widget is added to the parent layout
+        Clock.schedule_once(self.adjust_scroll)
 
         # Refresh UI
         self.canvas.ask_update()
+
+    def adjust_scroll(self, dt):
+        """Adjust the scroll position to the top."""
+        if self.parent and self.parent.parent:
+            self.parent.parent.scroll_y = 1
 
     def open_close_position_popup(self, row_index):
         """Open the Close Position popup."""
@@ -146,19 +154,29 @@ class TradeTable(GridLayout):
         # Highlight P/L (Green = Gain, Red = Loss)
         row_widgets[7].color = (0, 1, 0, 1) if pl > 0 else (1, 0, 0, 1)
 
-    # TODO: create save_trades method here
-    #       start with empty trades = [] variable
-    #       iterate over each row in self.trade_rows.
-    #       use another for loop to iterate over each item (column) in the row and append to new variable 'trade_data'
-    #       IMPORTANT: make sure to exclude the button item "Close Position". This is the last item in the row
-    #       append the newly created trade_data variable to trades List that you created in first step
-    #       open save file (json) for 'write' and use json.dump to create or overwrite the file.
-    #       optional: use print("print message here") to notify user their info was saved. See if you can print the save path as well
+    def save_trades(self):
+        """Save trades to a JSON file."""
+        trades = []
+        for row_widgets in self.trade_rows:
+            trade_data = []
+            for widget in row_widgets[:-1]:  # Exclude the "Close Position" button
+                trade_data.append(widget.text)
+            trades.append(trade_data)
+        
+        with open(SAVE_FILE, 'w') as f:
+            json.dump(trades, f)
+        print(f"Trades saved to {SAVE_FILE}")
 
-    # TODO: create load_trades method here
-    #       First use os.path.exists to check if save file exists.
-    #       Then open the file as 'read'. Use json.load to load file.
-    #       Iterate over each trade in trades loaded from json file, and leverage add_trade method in this class to create the table
+    def load_trades(self):
+        """Load trades from a JSON file."""
+        if os.path.exists(SAVE_FILE):
+            with open(SAVE_FILE, 'r') as f:
+                trades = json.load(f)
+            for trade in trades:
+                self.add_trade(trade)
+            print(f"Trades loaded from {SAVE_FILE}")
+        else:
+            print(f"No save file found at {SAVE_FILE}")
 
 
 class AddTradePopup(Popup):
