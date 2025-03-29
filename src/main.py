@@ -12,7 +12,8 @@ from kivy.core.window import Window
 from kivy.clock import Clock
 
 # Set a proper path to save file
-SAVE_FILE = "./../trades.json"
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+SAVE_FILE = os.path.join(SCRIPT_DIR, "./../.trades.json")
 
 
 class ClosePositionPopup(Popup):
