@@ -104,7 +104,7 @@ class ClosePositionPopup(Popup):
         except Exception as e:
             print(f"Unexpected error: {str(e)}")
 
-class OptionTable:
+class OptionTable(GridLayout):
     def __init__(self, **kwargs):
         super().__init__(cols=14, row_force_default=True, row_default_height=40, spacing=5, size_hint_y=None, **kwargs)
         self.bind(minimum_height=self.setter('height'))
@@ -337,11 +337,11 @@ class MainWindow(BoxLayout):
         self.add_widget(self.oscroll)
 
     def open_add_etrade_popup(self, instance):
-        popup = AddTradePopup(self.table)
+        popup = AddTradePopup(self.etable)
         popup.open()
 
     def open_add_otrade_popup(self, instance):
-        popup = AddOptionTradePopup(self.table)
+        popup = AddOptionTradePopup(self.otable)
         popup.open()
 
 
@@ -352,11 +352,15 @@ class TradeApp(App):
 
     def on_stop(self):
         """Save trades when the app closes."""
-        self.root.table.save_trades()
+        self.root.etable.save_trades()
+        self.root.otable.save_trades()
+
 
     def on_window_close(self, *args):
         """Save trades when the window is closed."""
-        self.root.table.save_trades()
+        self.root.etable.save_trades()
+        self.root.otable.save_trades()
+
 
 
 if __name__ == "__main__":
