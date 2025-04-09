@@ -13,8 +13,40 @@ from kivy.clock import Clock
 
 # Set a proper path to save file
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-SAVE_FILE = os.path.join(SCRIPT_DIR, "./../.trades.json")
+EQUITY_SAVE_FILE = os.path.join(SCRIPT_DIR, "./../.etrades.json")
+OPTION_SAVE_FILE = os.path.join(SCRIPT_DIR, "./../.otrades.json")
 
+class CloseOptionPositionPopup(Popup):
+    def __init__(self, otrade_table, row_index, **kwargs):
+        super().__init__(title="Close Option Position", size_hint=(0.7, 0.5), **kwargs)
+        self.otrade_table = otrade_table
+        self.row_index = row_index
+
+        layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
+
+        # Input Fields
+        # TODO
+
+        # Buttons
+        button_layout = BoxLayout(size_hint_y=None, height=50, spacing=20)
+        confirm_button = Button(text="Confirm", on_press=self.confirm_close_position)
+        cancel_button = Button(text="Cancel", on_press=self.dismiss)
+        button_layout.add_widget(confirm_button)
+        button_layout.add_widget(cancel_button)
+        layout.add_widget(button_layout)
+
+        self.content = layout
+
+    def confirm_close_position(self, instance):
+        """Validate input, update row with sell details, and compute P/L."""
+        try:
+            # TODO
+
+            self.otrade_table.close_position(self.row_index, close, close_prem)
+            self.dismiss()
+
+        except Exception as e:
+            print(f"Unexpected error: {str(e)}")
 
 class ClosePositionPopup(Popup):
     def __init__(self, trade_table, row_index, **kwargs):
@@ -72,6 +104,36 @@ class ClosePositionPopup(Popup):
         except Exception as e:
             print(f"Unexpected error: {str(e)}")
 
+class OptionTable:
+    def __init__(self, **kwargs):
+        super().__init__(cols=14, row_force_default=True, row_default_height=40, spacing=5, size_hint_y=None, **kwargs)
+        self.bind(minimum_height=self.setter('height'))
+        self.trade_rows = []
+
+        headers = [
+            "underlier", "date", "expiry", "type", "open", "strike",
+            "underlier_price", "premium", "fee", "qnt", "close", "close_prem", "P/L", "Action"
+        ]
+        for header in headers:
+            label = Label(text=header, bold=True, size_hint_y=None, height=40)
+            self.add_widget(label)
+
+        self.load_trades()
+
+    def add_trade(self, trade_data):
+        # TODO
+
+    def open_close_position_popup(self, index):
+        # TODO
+
+    def close_position(self, index, close, close_prem):
+        # TODO
+
+    def save_trades(self):
+        # TODO
+
+    def load_trades(self):
+        # TODO
 
 class TradeTable(GridLayout):
     def __init__(self, **kwargs):
@@ -164,20 +226,20 @@ class TradeTable(GridLayout):
                 trade_data.append(widget.text)
             trades.append(trade_data)
         
-        with open(SAVE_FILE, 'w') as f:
+        with open(EQUITY_SAVE_FILE, 'w') as f:
             json.dump(trades, f)
-        print(f"Trades saved to {SAVE_FILE}")
+        print(f"Trades saved to {EQUITY_SAVE_FILE}")
 
     def load_trades(self):
         """Load trades from a JSON file."""
-        if os.path.exists(SAVE_FILE):
-            with open(SAVE_FILE, 'r') as f:
+        if os.path.exists(EQUITY_SAVE_FILE):
+            with open(EQUITY_SAVE_FILE, 'r') as f:
                 trades = json.load(f)
             for trade in trades:
                 self.add_trade(trade)
-            print(f"Trades loaded from {SAVE_FILE}")
+            print(f"Trades loaded from {EQUITY_SAVE_FILE}")
         else:
-            print(f"No save file found at {SAVE_FILE}")
+            print(f"No save file found at {EQUITY_SAVE_FILE}")
 
 
 class AddTradePopup(Popup):
@@ -225,21 +287,61 @@ class AddTradePopup(Popup):
         except ValueError:
             print("Invalid Input: Ensure numeric fields contain valid numbers.")
 
+class AddOptionTradePopup(Popup):
+    def __init__(self, otrade_table, **kwargs):
+        super().__init__(title="Add Option Trade", size_hint=(0.7, 0.7), **kwargs)
+        self.otrade_table = otrade_table
+
+        layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
+
+        # Input Fields
+        # TODO
+
+        # Buttons
+        button_layout = BoxLayout(size_hint_y=None, height=50, spacing=20)
+        confirm_button = Button(text="Confirm", on_press=self.confirm_trade)
+        cancel_button = Button(text="Cancel", on_press=self.dismiss)
+        button_layout.add_widget(confirm_button)
+        button_layout.add_widget(cancel_button)
+        layout.add_widget(button_layout)
+
+        self.content = layout
+
+    def confirm_trade(self, instance):
+        """Validate input, calculate Notional, and add trade to the options table."""
+        try:
+            # TODO
+
+        except ValueError:
+            print("Invalid Input: Ensure numeric fields contain valid numbers.")
+
 
 class MainWindow(BoxLayout):
     def __init__(self, **kwargs):
         super().__init__(orientation="vertical", **kwargs)
 
-        self.add_trade_button = Button(text="Add Trade", size_hint=(1, 0.1), on_press=self.open_add_trade_popup)
+        self.add_trade_button = Button(text="Add Equity Trade", size_hint=(1, 0.1), on_press=self.open_add_etrade_popup)
         self.add_widget(self.add_trade_button)
 
-        self.scroll = ScrollView(size_hint=(1, 0.9))
-        self.table = TradeTable()
-        self.scroll.add_widget(self.table)
-        self.add_widget(self.scroll)
+        self.escroll = ScrollView(size_hint=(1, 0.9))
+        self.etable = TradeTable()
+        self.escroll.add_widget(self.etable)
+        self.add_widget(self.escroll)
 
-    def open_add_trade_popup(self, instance):
+        self.add_otrade_button = Button(text="Add Option Trade", size_hint=(1, 0.1), on_press=self.open_add_otrade_popup)
+        self.add_widget(self.add_otrade_button)
+
+        self.oscroll = ScrollView(size_hint=(1, 0.9))
+        self.otable = OptionTable()
+        self.oscroll.add_widget(self.otable)
+        self.add_widget(self.oscroll)
+
+    def open_add_etrade_popup(self, instance):
         popup = AddTradePopup(self.table)
+        popup.open()
+
+    def open_add_otrade_popup(self, instance):
+        popup = AddOptionTradePopup(self.table)
         popup.open()
 
 
