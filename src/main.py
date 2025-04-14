@@ -25,7 +25,16 @@ class CloseOptionPositionPopup(Popup):
         layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
 
         # Input Fields
-        # TODO
+        self.inputs = {}
+        fields = ["Close Price", "Close Premium"]
+        for field in fields:
+            box = BoxLayout(orientation="horizontal", size_hint_y=None, height=40)
+            label = Label(text=f"{field}:", size_hint_x=0.4)
+            text_input = TextInput(multiline=False)
+            self.inputs[field] = text_input
+            box.add_widget(label)
+            box.add_widget(text_input)
+            layout.add_widget(box)
 
         # Buttons
         button_layout = BoxLayout(size_hint_y=None, height=50, spacing=20)
@@ -40,7 +49,19 @@ class CloseOptionPositionPopup(Popup):
     def confirm_close_position(self, instance):
         """Validate input, update row with sell details, and compute P/L."""
         try:
-            # TODO
+            close_text = self.inputs["Close Price"].text.strip()
+            close_prem_text = self.inputs["Close Premium"].text.strip()
+
+            try:
+                close = float(close_text)
+                close_prem = float(close_prem_text)
+            except ValueError:
+                print("Close Price and Close Premium must be valid numbers.")
+                return
+
+            if close <= 0 or close_prem <= 0:
+                print("Close Price and Close Premium must be greater than 0.")
+                return
 
             self.otrade_table.close_position(self.row_index, close, close_prem)
             self.dismiss()
@@ -111,29 +132,131 @@ class OptionTable(GridLayout):
         self.trade_rows = []
 
         headers = [
-            "underlier", "date", "expiry", "type", "open", "strike",
-            "underlier_price", "premium", "fee", "qnt", "close", "close_prem", "P/L", "Action"
+            "Underlier", "Date", "Expiry", "Type", "Open", "Strike",
+            "Underlier Price", "Premium", "Fee", "Quantity", "Close", "Close Premium", "P/L", "Action"
         ]
         for header in headers:
-            label = Label(text=header, bold=True, size_hint_y=None, height=40)
+            label = Label(
+                text=header,
+                bold=True,
+                size_hint_y=None,
+                height=40,
+                padding_x=10,  
+                halign="center",  
+                valign="middle"   
+            )
+            label.bind(size=label.setter('text_size'))  # Ensure text stays within the label
             self.add_widget(label)
 
         self.load_trades()
 
     def add_trade(self, trade_data):
-        # TODO
+        """Add a new option trade row to the table."""
+        row_widgets = []
+
+        for data in trade_data:
+            label = Label(
+                text=str(data),
+                size_hint_y=None,
+                height=40,
+                padding_x=10,  
+                halign="center",  
+                valign="middle"  
+            )
+            label.bind(size=label.setter('text_size'))  # Ensure text stays within the label
+            self.add_widget(label)
+            row_widgets.append(label)
+
+        # Ensures a vertical layout for the "Action" column
+        action_layout = BoxLayout(
+            orientation="vertical",
+            size_hint_y=None,
+            height=40,
+            spacing=5
+        )
+
+        # Add "Close Position" button
+        close_btn = Button(text="Close Position", size_hint_y=None, height=40)
+        close_btn.bind(on_press=lambda instance, index=len(self.trade_rows): self.open_close_position_popup(index=index))
+        action_layout.add_widget(close_btn)
+
+        self.add_widget(action_layout)
+        row_widgets.append(action_layout)
+
+        # Store row for updating later
+        self.trade_rows.append(row_widgets)
+
+        # Update table height
+        self.height = len(self.trade_rows) * 40 + 40
+
+        # Defer the scroll adjustment until after the widget is added to the parent layout
+        Clock.schedule_once(self.adjust_scroll)
+
+        # Refresh UI
+        self.canvas.ask_update()
 
     def open_close_position_popup(self, index):
-        # TODO
+        """Open the Close Option Position popup."""
+        popup = CloseOptionPositionPopup(self, index)
+        popup.open()
 
     def close_position(self, index, close, close_prem):
-        # TODO
+        """Close position, update sell details, and compute P/L."""
+        try:
+            row_widgets = self.trade_rows[index]
+
+            # Update Close Price and Close Premium
+            row_widgets[10].text = f"{close:.2f}"
+            row_widgets[11].text = f"{close_prem:.2f}"
+
+            # Calculate P/L
+            open_price = float(row_widgets[4].text)
+            premium = float(row_widgets[7].text)
+            fee = float(row_widgets[8].text)
+            quantity = int(row_widgets[9].text)
+
+            pl = (close - open_price) * (quantity * 100) - fee 
+            row_widgets[12].text = f"{pl:.2f}"
+
+            # Highlight P/L (Green = Gain, Red = Loss)
+            row_widgets[12].color = (0, 1, 0, 1) if pl > 0 else (1, 0, 0, 1)
+
+            print(f"Option trade at index {index} closed successfully.")
+        except Exception as e:
+            print(f"Error closing option position: {e}")
 
     def save_trades(self):
-        # TODO
+        """Save option trades to a JSON file."""
+        trades = []
+        for row_widgets in self.trade_rows:
+            trade_data = []
+            for widget in row_widgets[:-1]:  # Exclude the "Close Position" button
+                trade_data.append(widget.text)
+            trades.append(trade_data)
+
+        with open(OPTION_SAVE_FILE, 'w') as f:
+            json.dump(trades, f)
+        print(f"Option trades saved to {OPTION_SAVE_FILE}")
 
     def load_trades(self):
-        # TODO
+        """Load option trades from a JSON file."""
+        if os.path.exists(OPTION_SAVE_FILE):
+            try:
+                with open(OPTION_SAVE_FILE, 'r') as f:
+                    trades = json.load(f)
+                for trade in trades:
+                    self.add_trade(trade)
+                print(f"Option trades loaded from {OPTION_SAVE_FILE}")
+            except json.JSONDecodeError:
+                print(f"Error: {OPTION_SAVE_FILE} contains invalid JSON. Starting with an empty table.")
+                trades = []
+        else:
+            print(f"No save file found at {OPTION_SAVE_FILE}")
+
+    def adjust_scroll(self, dt):
+        """Adjust the scroll position to the top."""
+        if self.parent and self.parent.parent:
+            self.parent.parent.scroll_y = 1
 
 class TradeTable(GridLayout):
     def __init__(self, **kwargs):
@@ -154,15 +277,33 @@ class TradeTable(GridLayout):
         row_widgets = []
 
         for data in trade_data:
-            label = Label(text=str(data), size_hint_y=None, height=40)
+            label = Label(
+                text=str(data),
+                size_hint_y=None,
+                height=40,
+                padding_x=10,  # Add horizontal padding
+                halign="center",  # Center-align text
+                valign="middle"  # Middle-align text
+            )
+            label.bind(size=label.setter('text_size'))  # Ensure text wraps within the label
             self.add_widget(label)
             row_widgets.append(label)
+
+        # Add a vertical layout for the "Action" column
+        action_layout = BoxLayout(
+            orientation="vertical",
+            size_hint_y=None,
+            height=40,
+            spacing=5
+        )
 
         # Add "Close Position" button
         close_btn = Button(text="Close Position", size_hint_y=None, height=40)
         close_btn.bind(on_press=lambda instance, index=len(self.trade_rows): self.open_close_position_popup(index))
-        self.add_widget(close_btn)
-        row_widgets.append(close_btn)
+        action_layout.add_widget(close_btn)
+
+        self.add_widget(action_layout)
+        row_widgets.append(action_layout)
 
         # Store row for updating later
         self.trade_rows.append(row_widgets)
@@ -195,27 +336,32 @@ class TradeTable(GridLayout):
 
     def close_position(self, row_index, sell_date, sell_price):
         """Close position, update sell details, and compute P/L."""
-        row_widgets = self.trade_rows[row_index]
-
-        # Remove any non-numeric formatting
-        buy_price_text = row_widgets[2].text.strip()
         try:
-            buy_price = float(buy_price_text)
-        except ValueError:
-            print("Conversion Error: Could not convert Buy Price to a number.")
-            return
+            row_widgets = self.trade_rows[row_index]
 
-        # Update Sell Date and Sell Price
-        row_widgets[5].text = sell_date
-        row_widgets[6].text = f"{sell_price:.2f}"
+            # Remove any non-numeric formatting
+            buy_price_text = row_widgets[2].text.strip()
+            try:
+                buy_price = float(buy_price_text)
+            except ValueError:
+                print("Conversion Error: Could not convert Buy Price to a number.")
+                return
 
-        # Calculate P/L
-        num_shares = int(row_widgets[3].text)
-        pl = (sell_price - buy_price) * num_shares
-        row_widgets[7].text = f"{pl:.2f}"
+            # Update Sell Date and Sell Price
+            row_widgets[5].text = sell_date
+            row_widgets[6].text = f"{sell_price:.2f}"
 
-        # Highlight P/L (Green = Gain, Red = Loss)
-        row_widgets[7].color = (0, 1, 0, 1) if pl > 0 else (1, 0, 0, 1)
+            # Calculate P/L
+            num_shares = int(row_widgets[3].text)
+            pl = (sell_price - buy_price) * num_shares
+            row_widgets[7].text = f"{pl:.2f}"
+
+            # Highlight P/L (Green = Gain, Red = Loss)
+            row_widgets[7].color = (0, 1, 0, 1) if pl > 0 else (1, 0, 0, 1)
+
+            print(f"Equity trade at index {row_index} closed successfully.")
+        except Exception as e:
+            print(f"Error closing equity position: {e}")
 
     def save_trades(self):
         """Save trades to a JSON file."""
@@ -233,11 +379,15 @@ class TradeTable(GridLayout):
     def load_trades(self):
         """Load trades from a JSON file."""
         if os.path.exists(EQUITY_SAVE_FILE):
-            with open(EQUITY_SAVE_FILE, 'r') as f:
-                trades = json.load(f)
-            for trade in trades:
-                self.add_trade(trade)
-            print(f"Trades loaded from {EQUITY_SAVE_FILE}")
+            try:
+                with open(EQUITY_SAVE_FILE, 'r') as f:
+                    trades = json.load(f)
+                for trade in trades:
+                    self.add_trade(trade)
+                print(f"Trades loaded from {EQUITY_SAVE_FILE}")
+            except json.JSONDecodeError:
+                print(f"Error: {EQUITY_SAVE_FILE} contains invalid JSON. Starting with an empty table.")
+                trades = []
         else:
             print(f"No save file found at {EQUITY_SAVE_FILE}")
 
@@ -295,7 +445,16 @@ class AddOptionTradePopup(Popup):
         layout = BoxLayout(orientation="vertical", padding=10, spacing=10)
 
         # Input Fields
-        # TODO
+        self.inputs = {}
+        fields = ["Underlier", "Date", "Expiry", "Type", "Open Price", "Strike Price", "Underlier Price", "Premium", "Fee", "Quantity"]
+        for field in fields:
+            box = BoxLayout(orientation="horizontal", size_hint_y=None, height=40)
+            label = Label(text=f"{field}:", size_hint_x=0.4)
+            text_input = TextInput(multiline=False)
+            self.inputs[field] = text_input
+            box.add_widget(label)
+            box.add_widget(text_input)
+            layout.add_widget(box)
 
         # Buttons
         button_layout = BoxLayout(size_hint_y=None, height=50, spacing=20)
@@ -310,7 +469,23 @@ class AddOptionTradePopup(Popup):
     def confirm_trade(self, instance):
         """Validate input, calculate Notional, and add trade to the options table."""
         try:
-            # TODO
+            underlier = self.inputs["Underlier"].text.strip().upper()
+            date = self.inputs["Date"].text.strip()
+            expiry = self.inputs["Expiry"].text.strip()
+            type_ = self.inputs["Type"].text.strip().upper()
+            open_price = float(self.inputs["Open Price"].text)
+            strike_price = float(self.inputs["Strike Price"].text)
+            underlier_price = float(self.inputs["Underlier Price"].text)
+            premium = float(self.inputs["Premium"].text)
+            fee = float(self.inputs["Fee"].text)
+            quantity = int(self.inputs["Quantity"].text)
+
+            trade_data = [
+                underlier, date, expiry, type_, f"{open_price:.2f}", f"{strike_price:.2f}",
+                f"{underlier_price:.2f}", f"{premium:.2f}", f"{fee:.2f}", str(quantity), "-", "-", "-"
+            ]
+            self.otrade_table.add_trade(trade_data)
+            self.dismiss()
 
         except ValueError:
             print("Invalid Input: Ensure numeric fields contain valid numbers.")
